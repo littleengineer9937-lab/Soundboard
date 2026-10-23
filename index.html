@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soundboard</title>
+<style>
+:root{--bg:#E8EBF2;--ink:#151827;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#171A29;--ink:#EEF0F7;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.4}
+main{max-width:960px;margin:0 auto;padding:28px 20px 48px}
+h1{margin:0 0 24px;font-size:clamp(2rem,6vw,3rem);font-weight:800;letter-spacing:-.025em;line-height:1}
+.hit:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px}
+.pad{display:flex;flex-direction:column;gap:12px}
+.hit{position:relative;overflow:hidden;width:100%;min-height:clamp(160px,26vh,240px);border:0;border-radius:28px;
+  background:var(--c);color:var(--on);display:flex;flex-direction:column;justify-content:space-between;
+  align-items:stretch;padding:20px 22px;cursor:pointer;text-align:left;font:inherit;transition:transform .08s}
+.hit::before{content:"";position:absolute;left:0;right:0;bottom:0;height:calc(var(--p,0)*100%);background:var(--d);transition:height .25s linear}
+.hit>*{position:relative}
+.hit:active{transform:scale(.98)}
+.top{display:flex;justify-content:space-between;align-items:center;font-weight:500}
+kbd{font:inherit;font-size:.85rem;border:1.5px solid currentColor;border-radius:8px;padding:0 8px;opacity:.75}
+.name{display:block;font-size:clamp(2.4rem,8vw,3.8rem);font-weight:800;letter-spacing:-.03em;line-height:1}
+.time{display:block;margin-top:8px;font-variant-numeric:tabular-nums;opacity:.9}
+.seek{width:100%;margin:0;accent-color:var(--c);cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <h1>Soundboard</h1>
+  <section id="grid" aria-label="Sounds"></section>
+</main>
+
+<script>
+const clips = [
+  {name:'Leo',    c:'#2F4BFF', d:'#1B2FB8', on:'#FFFFFF', src:'https://audio.jukehost.co.uk/01a16ad7-1b4a-7329-a3a4-b24c0a0bde7c'},
+  {name:'Amar',   c:'#D6246E', d:'#9A1450', on:'#FFFFFF', src:'https://audio.jukehost.co.uk/01a16ad7-1c11-7149-96ad-fcde56791d83'},
+  {name:'Noah',   c:'#0E9F8C', d:'#096B5E', on:'#FFFFFF', src:'https://audio.jukehost.co.uk/01a16ad7-1c44-7086-be01-3ed8538e834a'},
+  {name:'Faizan', c:'#F2B01E', d:'#C98A00', on:'#1A1400', src:'https://audio.jukehost.co.uk/01a16ad7-1c1e-71c6-99d2-d3e2fed4b000'}
+];
+
+const grid = document.getElementById('grid');
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+clips.forEach((c, i) => {
+  const a = new Audio(c.src);
+  a.preload = 'metadata';
+  c.a = a;
+
+  const el = document.createElement('article');
+  el.className = 'pad';
+  el.style.cssText = `--c:${c.c};--d:${c.d};--on:${c.on}`;
+  el.innerHTML = `
+    <button class="hit" type="button" aria-label="Play ${c.name}">
+      <span class="top"><span class="state">Play</span><kbd>${i+1}</kbd></span>
+      <span><span class="name">${c.name}</span><span class="time">Loading</span></span>
+    </button>
+    <input class="seek" type="range" min="0" max="1000" value="0" aria-label="Seek ${c.name}">`;
+  grid.appendChild(el);
+
+  const hit = el.querySelector('.hit');
+  const state = el.querySelector('.state');
+  const time = el.querySelector('.time');
+  const seek = el.querySelector('.seek');
+
+  const draw = () => {
+    const p = a.duration ? a.currentTime / a.duration : 0;
+    hit.style.setProperty('--p', p);
+    seek.value = Math.round(p * 1000);
+    time.textContent = a.currentTime > 0 ? `${fmt(a.currentTime)} of ${fmt(a.duration)}` : fmt(a.duration);
+  };
+  const label = () => {
+    state.textContent = a.paused ? (a.currentTime > 0 ? 'Paused' : 'Play') : 'Playing';
+    hit.setAttribute('aria-label', (a.paused ? 'Play ' : 'Pause ') + c.name);
+  };
+
+  a.addEventListener('loadedmetadata', draw);
+  a.addEventListener('timeupdate', draw);
+  a.addEventListener('play', label);
+  a.addEventListener('pause', label);
+  a.addEventListener('ended', () => { a.currentTime = 0; draw(); label(); });
+  a.addEventListener('error', () => { time.textContent = 'Could not load this sound'; });
+
+  hit.addEventListener('click', () => toggle(i));
+  seek.addEventListener('input', () => {
+    if (a.duration) { a.currentTime = seek.value / 1000 * a.duration; draw(); }
+  });
+});
+
+function toggle(i) {
+  const a = clips[i].a;
+  if (a.paused) {
+    clips.forEach((c, j) => { if (j !== i) c.a.pause(); });
+    a.play().catch(() => {});
+  } else {
+    a.pause();
+  }
+}
+
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= clips.length) { e.preventDefault(); toggle(n - 1); }
+});
+</script>
+</body>
+</html>
